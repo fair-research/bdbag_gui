@@ -1,7 +1,8 @@
 from PyQt5 import QtCore
 from PyQt5.QtCore import pyqtSignal
+
 from bdbag import bdbag_api as bdb
-from impl.async_task import async_execute
+from bdbag_gui.impl.async_task import async_execute
 
 
 class BagTask(QtCore.QObject):

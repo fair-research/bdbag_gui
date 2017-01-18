@@ -14,11 +14,11 @@ setup(
     url='https://github.com/ini-bdds/bdbag_gui/',
     maintainer='USC Information Sciences Institute ISR Division',
     maintainer_email='misd-support@isi.edu',
-    version="0.1.0",
+    version="0.1.1",
     packages=find_packages(),
     entry_points={
-        'console_scripts': [
-            'bdbag_gui = bdbag_gui:main'
+        'gui_scripts': [
+            'bdbag-gui = bdbag_gui.__main__:main',
         ]
     },
     requires=[

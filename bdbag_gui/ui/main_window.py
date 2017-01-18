@@ -1,11 +1,12 @@
-import os
 import logging
+import os
+
 from PyQt5.QtCore import *
 from PyQt5.QtWidgets import *
-from ui.log_widget import QPlainTextEditLogger
-from impl import async_task
-from impl import bag_tasks
 from bdbag import bdbag_api as bdb
+from bdbag_gui.ui import log_widget
+from bdbag_gui.impl import async_task
+from bdbag_gui.impl import bag_tasks
 
 
 # noinspection PyBroadException,PyArgumentList
@@ -305,7 +306,7 @@ class MainWindowUI(object):
 
     # Log Widget
 
-        self.logTextBrowser = QPlainTextEditLogger(self.centralWidget)
+        self.logTextBrowser = log_widget.QPlainTextEditLogger(self.centralWidget)
         self.logTextBrowser.widget.setObjectName("logTextBrowser")
         self.logTextBrowser.widget.setStyleSheet(
             """

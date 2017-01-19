@@ -1,12 +1,15 @@
 import sys
-
-from PyQt5.QtWidgets import QApplication
+from PyQt5 import QtCore
+from PyQt5.QtWidgets import QApplication, QStyleFactory
 from bdbag_gui.ui import main_window as mw
 
 
 def main():
     try:
         app = QApplication(sys.argv)
+        app.setStyle(QStyleFactory.create('Fusion'))
+        app.setAttribute(QtCore.Qt.AA_EnableHighDpiScaling)
+        app.setAttribute(QtCore.Qt.AA_UseHighDpiPixmaps)
         mainWindow = mw.MainWindow()
         mainWindow.show()
         ret = app.exec()

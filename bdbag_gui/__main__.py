@@ -8,7 +8,6 @@ def main():
     try:
         app = QApplication(sys.argv)
         app.setStyle(QStyleFactory.create('Fusion'))
-        app.setAttribute(QtCore.Qt.AA_EnableHighDpiScaling)
         app.setAttribute(QtCore.Qt.AA_UseHighDpiPixmaps)
         mainWindow = mw.MainWindow()
         mainWindow.show()

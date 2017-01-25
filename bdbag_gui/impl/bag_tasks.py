@@ -28,7 +28,7 @@ class BagCreateOrUpdateTask(BagTask):
     def success_callback(self, rid, result):
         if rid != self.rid:
             return
-        self.status_update_signal.emit(True, "Bag %s completed successfully" % "update" if self.update else "creation")
+        self.status_update_signal.emit(True, "Bag %s completed successfully" % ("update" if self.update else "creation"))
 
     def error_callback(self, rid, error):
         if rid != self.rid:
@@ -40,6 +40,31 @@ class BagCreateOrUpdateTask(BagTask):
         self.init_request()
         self.request = async_execute(bdb.make_bag,
                                      [bagPath, ['md5', 'sha256'], update],
+                                     self.rid,
+                                     self.success_callback,
+                                     self.error_callback)
+
+
+class BagRevertTask(BagTask):
+    status_update_signal = pyqtSignal(bool, str)
+
+    def __init__(self, parent=None):
+        super(BagRevertTask, self).__init__(parent)
+
+    def success_callback(self, rid, result):
+        if rid != self.rid:
+            return
+        self.status_update_signal.emit(False, "Bag reverted successfully")
+
+    def error_callback(self, rid, error):
+        if rid != self.rid:
+            return
+        self.status_update_signal.emit(True, "Bag reversion failed")
+
+    def revert(self, bagPath):
+        self.init_request()
+        self.request = async_execute(bdb.revert_bag,
+                                     [bagPath],
                                      self.rid,
                                      self.success_callback,
                                      self.error_callback)

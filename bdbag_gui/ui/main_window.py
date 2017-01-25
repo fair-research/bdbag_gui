@@ -1,9 +1,12 @@
-import logging
 import os
+import logging
 
-from PyQt5.QtCore import *
-from PyQt5.QtWidgets import *
+from PyQt5.QtCore import Qt, QMetaObject, QModelIndex, QThreadPool, pyqtSlot
+from PyQt5.QtWidgets import QApplication, QMainWindow, QWidget, QAction, QMenu, QMenuBar, QMessageBox, QStyle, \
+    QProgressBar, QToolBar, QStatusBar, QVBoxLayout, QTreeView, QFileSystemModel, qApp
+from PyQt5.QtGui import QIcon
 from bdbag import bdbag_api as bdb
+from bdbag_gui import resources
 from bdbag_gui.ui import log_widget
 from bdbag_gui.impl import async_task
 from bdbag_gui.impl import bag_tasks
@@ -53,6 +56,7 @@ class MainWindow(QMainWindow):
         self.ui.actionCancel.setEnabled(True)
         self.ui.treeView.setEnabled(False)
         self.ui.actionCreateOrUpdate.setEnabled(False)
+        self.ui.actionRevert.setEnabled(False)
         self.ui.actionFetchMissing.setEnabled(False)
         self.ui.actionFetchAll.setEnabled(False)
         self.ui.actionValidateFast.setEnabled(False)
@@ -64,6 +68,7 @@ class MainWindow(QMainWindow):
         self.ui.treeView.setEnabled(True)
         self.ui.toggleCreateOrUpdate(self)
         self.ui.actionCreateOrUpdate.setEnabled(os.path.isdir(self.currentPath) if self.currentPath else False)
+        self.ui.actionRevert.setEnabled(self.isBag)
         self.ui.actionFetchMissing.setEnabled(self.isBag)
         self.ui.actionFetchAll.setEnabled(self.isBag)
         self.ui.actionValidateFast.setEnabled(self.isBag)
@@ -127,6 +132,30 @@ class MainWindow(QMainWindow):
         createOrUpdateTask = bag_tasks.BagCreateOrUpdateTask()
         createOrUpdateTask.status_update_signal.connect(self.onBagCreated)
         createOrUpdateTask.createOrUpdate(self.currentPath, self.isBag)
+
+    @pyqtSlot(bool)
+    def on_actionRevert_triggered(self):
+        if not self.currentPath:
+            return
+
+        msg = QMessageBox()
+        msg.setIcon(QMessageBox.Warning)
+        msg.setWindowTitle("Confirm Action")
+        msg.setWindowIcon(QIcon(":/images/bag.png"))
+        msg.setText("Are you sure you want to revert this bag directory?")
+        msg.setInformativeText("Reverting a bag directory will cause all manifests to be deleted including fetch.txt, "
+                               "if present.\n\nIf a bag contains remote file references, these files will no longer be "
+                               "resolvable.\n\nIt is recommended that you either resolve any remote files prior to "
+                               "reverting such a bag, or make a backup copy of it first.")
+        msg.setStandardButtons(QMessageBox.Ok | QMessageBox.Cancel)
+        ret = msg.exec_()
+        if ret == QMessageBox.Cancel:
+            return
+
+        self.bagTaskTriggered()
+        revertTask = bag_tasks.BagRevertTask()
+        revertTask.status_update_signal.connect(self.onBagCreated)
+        revertTask.revert(self.currentPath)
 
     @pyqtSlot(bool)
     def on_actionArchiveZIP_triggered(self):
@@ -215,8 +244,9 @@ class MainWindowUI(object):
 
         # Main Window
         MainWin.setObjectName("MainWindow")
-        MainWin.setWindowTitle(MainWin.tr("BDBagGUI"))
-        MainWin.resize(800, 800)
+        MainWin.setWindowTitle(MainWin.tr("BDBag"))
+        MainWin.setWindowIcon(QIcon(":/images/bag.png"))
+        MainWin.resize(640, 600)
         self.centralWidget = QWidget(MainWin)
         self.centralWidget.setObjectName("centralWidget")
         MainWin.setCentralWidget(self.centralWidget)
@@ -230,6 +260,14 @@ class MainWindowUI(object):
         # Create/Update
         self.actionCreateOrUpdate = QAction(MainWin)
         self.actionCreateOrUpdate.setObjectName("actionCreateOrUpdate")
+
+        # Revert
+        self.actionRevert = QAction(MainWin)
+        self.actionRevert.setObjectName("actionRevert")
+        self.actionRevert.setText(MainWin.tr("Revert"))
+        self.actionRevert.setToolTip(
+            MainWin.tr("Revert a bag directory back to a normal directory."))
+        self.actionRevert.setShortcut(MainWin.tr("Ctrl+R"))
 
         # Validate Fast
         self.actionValidateFast = QAction(MainWin)
@@ -321,7 +359,6 @@ class MainWindowUI(object):
     # Menu Bar
 
         self.menuBar = QMenuBar(MainWin)
-        self.menuBar.setGeometry(QRect(0, 0, 732, 25))
         self.menuBar.setObjectName("menuBar")
         MainWin.setMenuBar(self.menuBar)
 
@@ -331,6 +368,7 @@ class MainWindowUI(object):
         self.menuBag.setTitle(MainWin.tr("Bag"))
         self.menuBar.addAction(self.menuBag.menuAction())
         self.menuBag.addAction(self.actionCreateOrUpdate)
+        self.menuBag.addAction(self.actionRevert)
         self.menuBag.addAction(self.actionCancel)
 
         # Fetch Menu
@@ -375,6 +413,11 @@ class MainWindowUI(object):
         self.mainToolBar.addAction(self.actionCreateOrUpdate)
         self.actionCreateOrUpdate.setIcon(
             self.actionCreateOrUpdate.parentWidget().style().standardIcon(getattr(QStyle, "SP_FileDialogNewFolder")))
+
+        # Revert
+        self.mainToolBar.addAction(self.actionRevert)
+        self.actionRevert.setIcon(
+            self.actionRevert.parentWidget().style().standardIcon(getattr(QStyle, "SP_DialogOkButton")))
 
         # Fetch
         self.mainToolBar.addAction(self.actionFetchMissing)

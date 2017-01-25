@@ -14,7 +14,7 @@ setup(
     url='https://github.com/ini-bdds/bdbag_gui/',
     maintainer='USC Information Sciences Institute ISR Division',
     maintainer_email='misd-support@isi.edu',
-    version="0.1.2",
+    version="0.1.3",
     packages=find_packages(),
     entry_points={
         'gui_scripts': [
@@ -26,9 +26,9 @@ setup(
         'sys',
         'logging',
         'PyQt5'],
-    install_requires=['bdbag==0.9.8'],
+    install_requires=['bdbag==0.9.9'],
     dependency_links=[
-         "http://github.com/ini-bdds/bdbag/archive/master.zip#egg=bdbag-0.9.8"
+         "http://github.com/ini-bdds/bdbag/archive/master.zip#egg=bdbag-0.9.9"
     ],
 
     license='GNU GPL 3.0',

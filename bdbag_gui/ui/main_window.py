@@ -5,8 +5,8 @@ from PyQt5.QtCore import Qt, QMetaObject, QModelIndex, QThreadPool, pyqtSlot
 from PyQt5.QtWidgets import QApplication, QMainWindow, QWidget, QAction, QMenu, QMenuBar, QMessageBox, QStyle, \
     QProgressBar, QToolBar, QStatusBar, QVBoxLayout, QTreeView, QFileSystemModel, qApp
 from PyQt5.QtGui import QIcon
-from bdbag import bdbag_api as bdb
-from bdbag_gui import resources
+from bdbag import VERSION as BDBAG_VERSION, BAGIT_VERSION, bdbag_api as bdb
+from bdbag_gui import resources, VERSION
 from bdbag_gui.ui import log_widget
 from bdbag_gui.impl import async_task
 from bdbag_gui.impl import bag_tasks
@@ -141,7 +141,6 @@ class MainWindow(QMainWindow):
         msg = QMessageBox()
         msg.setIcon(QMessageBox.Warning)
         msg.setWindowTitle("Confirm Action")
-        msg.setWindowIcon(QIcon(":/images/bag.png"))
         msg.setText("Are you sure you want to revert this bag directory?")
         msg.setInformativeText("Reverting a bag directory will cause all manifests to be deleted including fetch.txt, "
                                "if present.\n\nIf a bag contains remote file references, these files will no longer be "
@@ -236,6 +235,16 @@ class MainWindow(QMainWindow):
         self.ui.progressBar.reset()
         self.enableControls()
 
+    @pyqtSlot()
+    def on_actionAbout_triggered(self):
+        msg = QMessageBox()
+        msg.setIcon(QMessageBox.Information)
+        msg.setWindowTitle("About BDBag GUI")
+        msg.setText("Version Information")
+        msg.setInformativeText("BDBag GUI: %s\nBDBag: %s\nBagit: %s\n" % (VERSION, BDBAG_VERSION, BAGIT_VERSION))
+        msg.setStandardButtons(QMessageBox.Ok)
+        ret = msg.exec_()
+
 
 # noinspection PyArgumentList,PyAttributeOutsideInit
 class MainWindowUI(object):
@@ -245,7 +254,6 @@ class MainWindowUI(object):
         # Main Window
         MainWin.setObjectName("MainWindow")
         MainWin.setWindowTitle(MainWin.tr("BDBag"))
-        MainWin.setWindowIcon(QIcon(":/images/bag.png"))
         MainWin.resize(640, 600)
         self.centralWidget = QWidget(MainWin)
         self.centralWidget.setObjectName("centralWidget")
@@ -328,6 +336,7 @@ class MainWindowUI(object):
         self.actionAbout = QAction(MainWin)
         self.actionAbout.setObjectName("actionAbout")
         self.actionAbout.setText(MainWin.tr("About"))
+        self.actionAbout.setToolTip(MainWin.tr("Show version information."))
         self.actionAbout.setShortcut(MainWin.tr("Ctrl+B"))
 
     # Tree View

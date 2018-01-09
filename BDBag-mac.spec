@@ -37,7 +37,7 @@ app = BUNDLE(coll,
          bundle_identifier='edu.isi.isrd.BDBag',
          info_plist={
             'CFBundleDisplayName': 'BDBag',
-            'CFBundleShortVersionString':'0.2.1',
+            'CFBundleShortVersionString':'0.2.2',
             'NSPrincipalClass':'NSApplication',
             'NSHighResolutionCapable': 'True'
          })

@@ -23,6 +23,18 @@ a = Analysis(['bdbag_gui/__main__.py'],
 
 pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
 
+exe = EXE(pyz,
+          a.scripts,
+          a.binaries,
+          a.zipfiles,
+          a.datas,
+          name='BDBag',
+          debug=False,
+          strip=False,
+          upx=True,
+          console=False,
+          icon='bdbag_gui/images/bag.ico')
+
 coll = COLLECT(exe,
                a.binaries,
                a.zipfiles,

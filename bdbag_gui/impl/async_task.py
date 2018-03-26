@@ -49,7 +49,6 @@ class Request(QtCore.QRunnable):
             requester.Success.emit(self.uid, result)
         except:
             (etype, value, traceback) = sys.exc_info()
-            sys.excepthook(etype, value, traceback)
             if self.cancelled:
                 return
             requester.Error.emit(self.uid, str(value))

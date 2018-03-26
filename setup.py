@@ -14,7 +14,7 @@ setup(
     url='https://github.com/ini-bdds/bdbag_gui/',
     maintainer='USC Information Sciences Institute, Informatics Systems Research Division',
     maintainer_email='isrd-support@isi.edu',
-    version="0.2.4",
+    version="0.3.0",
     packages=find_packages(),
     entry_points={
         'gui_scripts': [
@@ -26,7 +26,7 @@ setup(
         'sys',
         'logging',
         'PyQt5'],
-    install_requires=['bdbag>=1.1.4'],
+    install_requires=['bdbag>=1.2.4'],
     license='GNU GPL 3.0',
     classifiers=[
         'Intended Audience :: Science/Research',
@@ -38,7 +38,8 @@ setup(
         'Programming Language :: Python',
         'Programming Language :: Python :: 3.3',
         'Programming Language :: Python :: 3.4',
-        'Programming Language :: Python :: 3.5'
+        'Programming Language :: Python :: 3.5',
+        'Programming Language :: Python :: 3.6'
     ]
 )
 

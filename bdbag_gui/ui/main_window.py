@@ -5,9 +5,10 @@ from PyQt5.QtCore import Qt, QMetaObject, QModelIndex, QThreadPool, pyqtSlot
 from PyQt5.QtWidgets import QApplication, QMainWindow, QWidget, QAction, QMenu, QMenuBar, QMessageBox, QStyle, \
     QProgressBar, QToolBar, QStatusBar, QVBoxLayout, QTreeView, QFileSystemModel, qApp
 from PyQt5.QtGui import QIcon
-from bdbag import VERSION as BDBAG_VERSION, BAGIT_VERSION, bdbag_api as bdb
+from bdbag import VERSION as BDBAG_VERSION, BAGIT_VERSION, DEFAULT_CONFIG_FILE, bdbag_api as bdb
+from bdbag.fetch.auth.keychain import DEFAULT_KEYCHAIN_FILE
 from bdbag_gui import resources, VERSION
-from bdbag_gui.ui import log_widget
+from bdbag_gui.ui import log_widget, options_window
 from bdbag_gui.impl import async_task
 from bdbag_gui.impl import bag_tasks
 
@@ -19,6 +20,8 @@ class MainWindow(QMainWindow):
         super(MainWindow, self).__init__()
         self.isBag = False
         self.currentPath = None
+        self.bagConfigFilePath = DEFAULT_CONFIG_FILE
+        self.bagKeychainFilePath = DEFAULT_KEYCHAIN_FILE
         self.ui = MainWindowUI()
         self.ui.setup_ui(self)
         self.ui.logTextBrowser.widget.log_update_signal.connect(self.updateLog)
@@ -46,9 +49,9 @@ class MainWindow(QMainWindow):
                 self.isBag = bdb.is_bag(self.currentPath)
                 QApplication.restoreOverrideCursor()
                 if self.isBag:
-                    self.updateStatus("The directory [%s] is a bag." % self.currentPath)
+                    self.updateStatus("The directory [%s] is a bag." % self.currentPath, True)
                 else:
-                    self.updateStatus("The directory [%s] is NOT a bag." % self.currentPath)
+                    self.updateStatus("The directory [%s] is NOT a bag." % self.currentPath, False)
             else:
                 self.isBag = False
 
@@ -100,13 +103,16 @@ class MainWindow(QMainWindow):
         self.disableControls()
 
     @pyqtSlot(str)
-    def updateStatus(self, status):
-        logging.info(status)
+    def updateStatus(self, status, success=True):
+        if success:
+            logging.info(status)
+        else:
+            logging.error(status)
         self.statusBar().showMessage(status)
 
-    @pyqtSlot(str)
-    def updateUI(self, status):
-        self.updateStatus(status)
+    @pyqtSlot(str, bool)
+    def updateUI(self, status, success=True):
+        self.updateStatus(status, success)
         self.enableControls()
 
     @pyqtSlot(str)
@@ -119,10 +125,15 @@ class MainWindow(QMainWindow):
         self.ui.progressBar.setValue(current)
         self.ui.progressBar.repaint()
 
-    @pyqtSlot(bool, str)
-    def onBagCreated(self, success, status):
-        self.isBag = success
-        self.updateUI(status)
+    @pyqtSlot(str, bool, bool)
+    def onBagCreated(self, status, success, is_update):
+        self.isBag = True if is_update else success
+        self.updateUI(status, success)
+
+    @pyqtSlot(str, bool)
+    def onBagReverted(self, status, success):
+        self.isBag = not success
+        self.updateUI(status, success)
 
     @pyqtSlot(bool)
     def on_actionCreateOrUpdate_triggered(self):
@@ -131,7 +142,7 @@ class MainWindow(QMainWindow):
         self.bagTaskTriggered()
         createOrUpdateTask = bag_tasks.BagCreateOrUpdateTask()
         createOrUpdateTask.status_update_signal.connect(self.onBagCreated)
-        createOrUpdateTask.createOrUpdate(self.currentPath, self.isBag)
+        createOrUpdateTask.createOrUpdate(self.currentPath, self.isBag, self.bagConfigFilePath)
 
     @pyqtSlot(bool)
     def on_actionRevert_triggered(self):
@@ -153,7 +164,7 @@ class MainWindow(QMainWindow):
 
         self.bagTaskTriggered()
         revertTask = bag_tasks.BagRevertTask()
-        revertTask.status_update_signal.connect(self.onBagCreated)
+        revertTask.status_update_signal.connect(self.onBagReverted)
         revertTask.revert(self.currentPath)
 
     @pyqtSlot(bool)
@@ -183,7 +194,7 @@ class MainWindow(QMainWindow):
         self.bagTaskTriggered()
         validateTask = bag_tasks.BagValidateTask()
         validateTask.status_update_signal.connect(self.updateUI)
-        validateTask.validate(self.currentPath, True)
+        validateTask.validate(self.currentPath, True, self.bagConfigFilePath)
 
     @pyqtSlot(bool)
     def on_actionValidateFull_triggered(self):
@@ -193,7 +204,7 @@ class MainWindow(QMainWindow):
         validateTask = bag_tasks.BagValidateTask()
         validateTask.status_update_signal.connect(self.updateUI)
         validateTask.progress_update_signal.connect(self.updateProgress)
-        validateTask.validate(self.currentPath, False)
+        validateTask.validate(self.currentPath, False, self.bagConfigFilePath)
         self.updateStatus("Full validation initiated for bag: [%s] -- Please wait..." % self.currentPath)
 
     @pyqtSlot(bool)
@@ -204,7 +215,7 @@ class MainWindow(QMainWindow):
         fetchTask = bag_tasks.BagFetchTask()
         fetchTask.status_update_signal.connect(self.updateUI)
         fetchTask.progress_update_signal.connect(self.updateProgress)
-        fetchTask.fetch(self.currentPath, True)
+        fetchTask.fetch(self.currentPath, True, self.bagKeychainFilePath, self.bagConfigFilePath)
         self.updateStatus("Fetch all initiated for bag: [%s] -- Please wait..." % self.currentPath)
 
     @pyqtSlot(bool)
@@ -215,7 +226,7 @@ class MainWindow(QMainWindow):
         fetchTask = bag_tasks.BagFetchTask()
         fetchTask.status_update_signal.connect(self.updateUI)
         fetchTask.progress_update_signal.connect(self.updateProgress)
-        fetchTask.fetch(self.currentPath, False)
+        fetchTask.fetch(self.currentPath, False, self.bagKeychainFilePath, self.bagConfigFilePath)
         self.updateStatus("Fetch missing initiated for bag: [%s] -- Please wait..." % self.currentPath)
 
     @pyqtSlot(QModelIndex)
@@ -228,6 +239,10 @@ class MainWindow(QMainWindow):
                     index.row(), 0, index.parent()))))
         self.checkIfBag()
         self.enableControls()
+
+    @pyqtSlot(bool)
+    def on_actionOptions_triggered(self):
+        options_window.OptionsDialog.getOptions(self)
 
     @pyqtSlot(bool)
     def on_actionCancel_triggered(self):
@@ -254,7 +269,7 @@ class MainWindowUI(object):
         # Main Window
         MainWin.setObjectName("MainWindow")
         MainWin.setWindowTitle(MainWin.tr("BDBag"))
-        MainWin.resize(640, 600)
+        MainWin.resize(680, 600)
         self.centralWidget = QWidget(MainWin)
         self.centralWidget.setObjectName("centralWidget")
         MainWin.setCentralWidget(self.centralWidget)
@@ -325,6 +340,13 @@ class MainWindowUI(object):
         self.actionArchiveTGZ.setToolTip(MainWin.tr("Create a TAR/GZIP format archive of the bag."))
         self.actionArchiveTGZ.setShortcut(MainWin.tr("Ctrl+T"))
 
+        # Options
+        self.actionOptions = QAction(MainWin)
+        self.actionOptions.setObjectName("actionOptions")
+        self.actionOptions.setText(MainWin.tr("Options"))
+        self.actionOptions.setToolTip(MainWin.tr("Configuration options."))
+        self.actionOptions.setShortcut(MainWin.tr("Ctrl+O"))
+
         # Cancel
         self.actionCancel = QAction(MainWin)
         self.actionCancel.setObjectName("actionCancel")
@@ -379,6 +401,7 @@ class MainWindowUI(object):
         self.menuBag.addAction(self.actionCreateOrUpdate)
         self.menuBag.addAction(self.actionRevert)
         self.menuBag.addAction(self.actionCancel)
+        self.menuBag.addAction(self.actionOptions)
 
         # Fetch Menu
         self.menuFetch = QMenu(self.menuBag)
@@ -447,10 +470,15 @@ class MainWindowUI(object):
         # Archive
         self.mainToolBar.addAction(self.actionArchiveZIP)
         self.actionArchiveZIP.setIcon(
-            self.actionArchiveZIP.parentWidget().style().standardIcon(getattr(QStyle, "SP_FileDialogDetailedView")))
+            self.actionArchiveZIP.parentWidget().style().standardIcon(getattr(QStyle, "SP_DialogSaveButton")))
         self.mainToolBar.addAction(self.actionArchiveTGZ)
         self.actionArchiveTGZ.setIcon(
-            self.actionArchiveTGZ.parentWidget().style().standardIcon(getattr(QStyle, "SP_FileDialogDetailedView")))
+            self.actionArchiveTGZ.parentWidget().style().standardIcon(getattr(QStyle, "SP_DialogSaveButton")))
+
+        # Options
+        self.mainToolBar.addAction(self.actionOptions)
+        self.actionOptions.setIcon(
+            self.actionOptions.parentWidget().style().standardIcon(getattr(QStyle, "SP_FileDialogDetailedView")))
 
         # Cancel
         self.mainToolBar.addAction(self.actionCancel)

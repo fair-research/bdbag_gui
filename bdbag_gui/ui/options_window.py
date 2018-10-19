@@ -4,7 +4,7 @@ from PyQt5.QtCore import Qt, pyqtSlot
 from PyQt5.QtWidgets import QDialog, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, QPushButton, QFileDialog, \
     QGroupBox, QCheckBox, QMessageBox, QDialogButtonBox, qApp
 from .json_editor import JSONEditor
-from bdbag import DEFAULT_CONFIG_FILE
+from bdbag.bdbag_config import DEFAULT_CONFIG_FILE
 from bdbag.fetch.auth.keychain import DEFAULT_KEYCHAIN_FILE
 
 

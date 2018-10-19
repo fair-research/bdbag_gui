@@ -5,7 +5,8 @@ from PyQt5.QtCore import Qt, QMetaObject, QModelIndex, QThreadPool, pyqtSlot
 from PyQt5.QtWidgets import QApplication, QMainWindow, QWidget, QAction, QMenu, QMenuBar, QMessageBox, QStyle, \
     QProgressBar, QToolBar, QStatusBar, QVBoxLayout, QTreeView, QFileSystemModel, qApp
 from PyQt5.QtGui import QIcon
-from bdbag import VERSION as BDBAG_VERSION, BAGIT_VERSION, DEFAULT_CONFIG_FILE, bdbag_api as bdb
+from bdbag import VERSION as BDBAG_VERSION, BAGIT_VERSION, bdbag_api as bdb
+from bdbag.bdbag_config import DEFAULT_CONFIG_FILE
 from bdbag.fetch.auth.keychain import DEFAULT_KEYCHAIN_FILE
 from bdbag_gui import resources, VERSION
 from bdbag_gui.ui import log_widget, options_window

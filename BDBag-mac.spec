@@ -13,7 +13,7 @@ a = Analysis(['bdbag_gui/__main__.py'],
              pathex=[],
              binaries=None,
              datas=metadata,
-             hiddenimports=['bdbag', 'bagit'],
+             hiddenimports=['bdbag', 'bagit', 'boto3', 'botocore', 's3transfer', 'globus_sdk'],
              hookspath=[],
              runtime_hooks=[],
              excludes=[],
@@ -49,7 +49,7 @@ app = BUNDLE(coll,
          bundle_identifier='edu.isi.isrd.BDBag',
          info_plist={
             'CFBundleDisplayName': 'BDBag',
-            'CFBundleShortVersionString':'0.2.2',
+            'CFBundleShortVersionString':'0.4.0',
             'NSPrincipalClass':'NSApplication',
             'NSHighResolutionCapable': 'True'
          })

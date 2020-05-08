@@ -2,223 +2,152 @@ from PyQt5 import QtCore
 from PyQt5.QtCore import pyqtSignal
 
 from bdbag import bdbag_api as bdb
-from bdbag_gui.impl.async_task import async_execute
+from bdbag_gui.impl.async_task import Task, async_execute
 
 
 class BagTask(QtCore.QObject):
+    status_update_signal = pyqtSignal(str, bool)
+    progress_update_signal = pyqtSignal(int, int)
+
     def __init__(self, parent=None):
         super(BagTask, self).__init__(parent)
-        self.rid = 0
-        self.request = None
+        self.task = None
 
-    def init_request(self):
-        if self.request is not None:
-            self.request.cancelled = True
-            self.request = None
-        self.rid += 1
+    def start(self):
+        async_execute(self.task)
+
+    def cancel(self):
+        self.task.cancel()
+
+    def terminate(self):
+        self.task.terminate()
+
+    def set_status(self, status, success):
+        self.status_update_signal.emit(status, success)
+
+    def result_callback(self, result, success):
+        self.set_status(result, success)
+
+    def progress_callback(self, current, maximum):
+        if self.task.canceled:
+            return False
+
+        self.progress_update_signal.emit(current, maximum)
+        return True
 
 
 class BagCreateOrUpdateTask(BagTask):
-    status_update_signal = pyqtSignal(str, bool, bool)
 
     def __init__(self, parent=None):
         super(BagCreateOrUpdateTask, self).__init__(parent)
         self.update = False
 
-    def success_callback(self, rid, result):
-        if rid != self.rid:
-            return
-        self.status_update_signal.emit("Bag %s completed successfully." % ("update" if self.update else "creation"),
-                                       True, self.update)
+    def result_callback(self, result, success):
+        status = "Bag %s completed successfully." % ("update" if self.update else "creation") if success else \
+            "Bag %s error: %s" % ("update" if self.update else "creation", result)
+        self.set_status(status, success)
 
-    def error_callback(self, rid, error):
-        if rid != self.rid:
-            return
-        self.status_update_signal.emit("Bag %s error: %s" % ("update" if self.update else "creation", error),
-                                       False, self.update)
-
-    def createOrUpdate(self, bagPath, update, config_file):
+    def createOrUpdate(self, bag_path, update, config_file):
         self.update = update
-        self.init_request()
-        self.request = async_execute(bdb.make_bag,
-                                     [bagPath, ['md5', 'sha256'], update, True, False, None, None, None, config_file],
-                                     self.rid,
-                                     self.success_callback,
-                                     self.error_callback)
+        self.task = Task(bdb.make_bag,
+                         [bag_path, ['md5', 'sha256'], update, True, False, None, None, None, config_file],
+                         self.result_callback)
+        self.start()
 
 
 class BagRevertTask(BagTask):
-    status_update_signal = pyqtSignal(str, bool)
 
     def __init__(self, parent=None):
         super(BagRevertTask, self).__init__(parent)
 
-    def success_callback(self, rid, result):
-        if rid != self.rid:
-            return
-        self.status_update_signal.emit("Bag reverted successfully.", True)
+    def result_callback(self, result, success):
+        status = "Bag reverted successfully." if success else "Bag reversion failed: %s" % result
+        self.set_status(status, success)
 
-    def error_callback(self, rid, error):
-        if rid != self.rid:
-            return
-        self.status_update_signal.emit("Bag reversion failed: %s" % error, False)
-
-    def revert(self, bagPath):
-        self.init_request()
-        self.request = async_execute(bdb.revert_bag,
-                                     [bagPath],
-                                     self.rid,
-                                     self.success_callback,
-                                     self.error_callback)
+    def revert(self, bag_path):
+        self.task = Task(bdb.revert_bag,
+                         [bag_path],
+                         self.result_callback)
+        self.start()
 
 
 class BagValidateTask(BagTask):
 
-    status_update_signal = pyqtSignal(str, bool)
-    progress_update_signal = pyqtSignal(int, int)
-
     def __init__(self, parent=None):
         super(BagValidateTask, self).__init__(parent)
 
-    def success_callback(self, rid, result):
-        if rid != self.rid:
-            return
-        self.status_update_signal.emit("Bag validation complete.", True)
+    def result_callback(self, result, success):
+        status = "Bag validation complete." if success else "Bag validation error: %s" % result
+        self.set_status(status, success)
 
-    def error_callback(self, rid, error):
-        if rid != self.rid:
-            return
-        self.status_update_signal.emit("Bag validation error: %s" % error, False)
-
-    def progress_callback(self, current, maximum):
-        if self.request.cancelled:
-            return False
-
-        self.progress_update_signal.emit(current, maximum)
-        return True
-
-    def validate(self, bagPath, fast, config_file):
-        self.init_request()
-        self.request = async_execute(bdb.validate_bag,
-                                     [bagPath, fast, self.progress_callback, config_file],
-                                     self.rid,
-                                     self.success_callback,
-                                     self.error_callback)
+    def validate(self, bag_path, fast, config_file):
+        self.task = Task(bdb.validate_bag,
+                         [bag_path, fast, self.progress_callback, config_file],
+                         self.result_callback)
+        self.start()
 
 
 class BagFetchTask(BagTask):
 
-    status_update_signal = pyqtSignal(str, bool)
-    progress_update_signal = pyqtSignal(int, int)
-
     def __init__(self, parent=None):
         super(BagFetchTask, self).__init__(parent)
 
-    def success_callback(self, rid, result):
-        if rid != self.rid:
-            return
-        self.status_update_signal.emit("Bag fetch complete: All file references resolved successfully." if result else
-                                       "Bag fetch incomplete: Some file references were not resolved.", True)
+    def result_callback(self, result, success):
+        status = ("Bag fetch complete: All file references resolved successfully." if result else
+                  "Bag fetch incomplete: Some file references were not resolved.") if success else \
+            "Bag fetch error: %s" % result
+        self.set_status(status, success)
 
-    def error_callback(self, rid, error):
-        if rid != self.rid:
-            return
-        self.status_update_signal.emit("Bag fetch error: %s" % error, False)
-
-    def progress_callback(self, current, maximum):
-        if self.request.cancelled:
-            return False
-
-        self.progress_update_signal.emit(current, maximum)
-        return True
-
-    def fetch(self, bagPath, allRefs, keychainFile, configFile):
-        self.init_request()
-        self.request = async_execute(bdb.resolve_fetch,
-                                     [bagPath, allRefs, self.progress_callback, keychainFile, configFile],
-                                     self.rid,
-                                     self.success_callback,
-                                     self.error_callback)
+    def fetch(self, bag_path, fetch_all, keychain_file, config_file):
+        self.task = Task(bdb.resolve_fetch,
+                         [bag_path, fetch_all, self.progress_callback, keychain_file, config_file],
+                         self.result_callback)
+        self.start()
 
 
 class BagArchiveTask(BagTask):
-    status_update_signal = pyqtSignal(str, bool)
 
     def __init__(self, parent=None):
         super(BagArchiveTask, self).__init__(parent)
 
-    def success_callback(self, rid, result):
-        if rid != self.rid:
-            return
-        self.status_update_signal.emit("Bag archive complete.", True)
+    def result_callback(self, result, success):
+        status = "Bag archive complete." if success else "Bag archive error: %s" % result
+        self.set_status(status, success)
 
-    def error_callback(self, rid, error):
-        if rid != self.rid:
-            return
-        self.status_update_signal.emit("Bag archive error: %s" % error, False)
-
-    def archive(self, bagPath, archiver):
-        self.init_request()
-        self.request = async_execute(bdb.archive_bag,
-                                     [bagPath, archiver],
-                                     self.rid,
-                                     self.success_callback,
-                                     self.error_callback)
+    def archive(self, bag_path, archiver):
+        self.task = Task(bdb.archive_bag,
+                         [bag_path, archiver],
+                         self.result_callback)
+        self.start()
 
 
 class BagExtractTask(BagTask):
-    status_update_signal = pyqtSignal(str, bool)
 
     def __init__(self, parent=None):
         super(BagExtractTask, self).__init__(parent)
 
-    def success_callback(self, rid, result):
-        if rid != self.rid:
-            return
-        self.status_update_signal.emit("File extraction complete.", True)
+    def result_callback(self, result, success):
+        status = "File extraction complete." if success else "File extraction error: %s" % result
+        self.set_status(status, success)
 
-    def error_callback(self, rid, error):
-        if rid != self.rid:
-            return
-        self.status_update_signal.emit("File extraction error: %s" % error, False)
-
-    def extract(self, bagPath, output_path=None):
-        self.init_request()
-        self.request = async_execute(bdb.extract_bag,
-                                     [bagPath, output_path],
-                                     self.rid,
-                                     self.success_callback,
-                                     self.error_callback)
+    def extract(self, bag_path, output_path=None):
+        self.task = Task(bdb.extract_bag,
+                         [bag_path, output_path],
+                         self.result_callback)
+        self.start()
 
 
 class BagMaterializeTask(BagTask):
-    status_update_signal = pyqtSignal(str, bool)
-    progress_update_signal = pyqtSignal(int, int)
 
     def __init__(self, parent=None):
         super(BagMaterializeTask, self).__init__(parent)
 
-    def success_callback(self, rid, result):
-        if rid != self.rid:
-            return
-        self.status_update_signal.emit("Bag materialization complete.", True)
+    def result_callback(self, result, success):
+        status = "Bag materialization complete." if success else "Bag materialization error: %s" % result
+        self.set_status(status, success)
 
-    def error_callback(self, rid, error):
-        if rid != self.rid:
-            return
-        self.status_update_signal.emit("Bag materialization error: %s" % error, False)
-
-    def progress_callback(self, current, maximum):
-        if self.request.cancelled:
-            return False
-
-        self.progress_update_signal.emit(current, maximum)
-        return True
-
-    def materialize(self, bagPath, output_path=None):
-        self.init_request()
-        self.request = async_execute(bdb.materialize,
-                                     [bagPath, output_path, self.progress_callback, self.progress_callback],
-                                     self.rid,
-                                     self.success_callback,
-                                     self.error_callback)
+    def materialize(self, bag_path, output_path=None):
+        self.task = Task(bdb.materialize,
+                         [bag_path, output_path, self.progress_callback, self.progress_callback],
+                         self.result_callback)
+        self.start()

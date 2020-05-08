@@ -2,7 +2,7 @@ import os
 import json
 import logging
 
-from PyQt5.QtCore import Qt, QMetaObject, QModelIndex, QThreadPool, QTimer, QDir, pyqtSlot
+from PyQt5.QtCore import Qt, QMetaObject, QModelIndex, QThreadPool, QTimer, QMutex, pyqtSlot
 from PyQt5.QtWidgets import QApplication, QMainWindow, QWidget, QAction, QMenu, QMenuBar, QMessageBox, QStyle, \
     QProgressBar, QToolBar, QStatusBar, QVBoxLayout, QTreeView, QFileSystemModel, qApp
 from PyQt5.QtGui import QIcon
@@ -18,6 +18,8 @@ class MainWindow(QMainWindow):
 
     def __init__(self):
         super(MainWindow, self).__init__()
+        self.currentTask = None
+        self.currentTaskMutex = QMutex()
         self.options = DEFAULT_OPTIONS
         self.ui = MainWindowUI()
         self.ui.setup_ui(self)
@@ -102,6 +104,19 @@ class MainWindow(QMainWindow):
 
         return is_file_archive
 
+    def setCurrentTask(self, task, can_cancel=True):
+        if not self.currentTaskMutex.tryLock(10):
+            return False
+        self.currentTask = task
+        self.bagTaskTriggered(can_cancel)
+        return True
+
+    def clearCurrentTask(self):
+        if not self.currentTask:
+            return
+        self.currentTask = None
+        self.currentTaskMutex.unlock()
+
     def getCurrentPath(self):
         return os.path.normpath(os.path.abspath(self.fileSystemModel.filePath(self.ui.treeView.currentIndex())))
 
@@ -138,27 +153,30 @@ class MainWindow(QMainWindow):
         self.ui.actionValidateFull.setEnabled(is_bag)
         self.ui.toggleArchiveOrExtract(self, is_bag, is_file_archive)
 
-    def closeEvent(self, event):
-        self.cancelTasks()
-        event.accept()
-
-    def cancelTasks(self):
-        self.disableControls()
-        async_task.Request.shutdown()
-        self.statusBar().showMessage("Waiting for background tasks to terminate...")
-
-        while True:
-            qApp.processEvents()
-            if QThreadPool.globalInstance().waitForDone(10):
-                break
-
-        self.statusBar().showMessage("All background tasks terminated successfully.")
-
     def selectionChanged(self):
         self.ui.statusBar.clearMessage()
         self.ui.progressBar.reset()
         self.ui.logTextBrowser.widget.clear()
         self.enableControls()
+
+    def closeEvent(self, event):
+        self.cancelTasks()
+        event.accept()
+
+    def cancelTasks(self):
+        if not self.currentTask:
+            return
+
+        self.disableControls()
+        self.currentTask.cancel()
+        self.statusBar().showMessage("Waiting for background tasks to terminate...")
+
+        while True:
+            qApp.processEvents()
+            if not self.currentTask and QThreadPool.globalInstance().waitForDone(10):
+                break
+
+        self.statusBar().showMessage("All background tasks terminated successfully.")
 
     @pyqtSlot()
     def bagTaskTriggered(self, can_cancel=True):
@@ -178,6 +196,7 @@ class MainWindow(QMainWindow):
     @pyqtSlot(str, bool)
     def updateUI(self, status, success=True):
         self.updateStatus(status, success)
+        self.clearCurrentTask()
         self.enableControls(True)
 
     @pyqtSlot(str)
@@ -190,23 +209,15 @@ class MainWindow(QMainWindow):
         self.ui.progressBar.setValue(current)
         self.ui.progressBar.repaint()
 
-    @pyqtSlot(str, bool, bool)
-    def onBagCreated(self, status, success, is_update):
-        self.updateUI(status, success)
-
-    @pyqtSlot(str, bool)
-    def onBagReverted(self, status, success):
-        self.updateUI(status, success)
-
     @pyqtSlot(bool)
     def on_actionCreateOrUpdate_triggered(self):
         current_path = self.getCurrentPath()
         if not current_path:
             return
-        self.bagTaskTriggered()
-        createOrUpdateTask = bag_tasks.BagCreateOrUpdateTask()
-        createOrUpdateTask.status_update_signal.connect(self.onBagCreated)
-        createOrUpdateTask.createOrUpdate(current_path, self.checkIfBag(), self.options.get("bag_config_file_path"))
+        if not self.setCurrentTask(bag_tasks.BagCreateOrUpdateTask()):
+            return
+        self.currentTask.status_update_signal.connect(self.updateUI)
+        self.currentTask.createOrUpdate(current_path, self.checkIfBag(), self.options.get("bag_config_file_path"))
 
     @pyqtSlot(bool)
     def on_actionRevert_triggered(self):
@@ -227,21 +238,22 @@ class MainWindow(QMainWindow):
         if ret == QMessageBox.Cancel:
             return
 
-        self.bagTaskTriggered()
-        revertTask = bag_tasks.BagRevertTask()
-        revertTask.status_update_signal.connect(self.onBagReverted)
-        revertTask.revert(current_path)
+        if not self.setCurrentTask(bag_tasks.BagRevertTask()):
+            return
+        self.currentTask.status_update_signal.connect(self.updateUI)
+        self.currentTask.revert(current_path)
 
     @pyqtSlot(bool)
     def on_actionMaterialize_triggered(self):
         current_path = self.getCurrentPath()
         if not current_path:
             return
-        self.bagTaskTriggered()
-        materializeTask = bag_tasks.BagMaterializeTask()
-        materializeTask.status_update_signal.connect(self.updateUI)
-        materializeTask.progress_update_signal.connect(self.updateProgress)
-        materializeTask.materialize(current_path, self.options.get("archive_extract_dir"))
+
+        if not self.setCurrentTask(bag_tasks.BagMaterializeTask()):
+            return
+        self.currentTask.status_update_signal.connect(self.updateUI)
+        self.currentTask.progress_update_signal.connect(self.updateProgress)
+        self.currentTask.materialize(current_path, self.options.get("archive_extract_dir"))
         self.updateStatus("Materialize initiated for bag: [%s] -- Please wait..." % current_path)
 
     @pyqtSlot(bool)
@@ -252,17 +264,17 @@ class MainWindow(QMainWindow):
         is_bag = self.checkIfBag()
         is_file_archive = self.checkIfArchive()
         if is_file_archive:
-            self.bagTaskTriggered(can_cancel=False)
-            extractTask = bag_tasks.BagExtractTask()
-            extractTask.status_update_signal.connect(self.updateUI)
-            extractTask.extract(current_path, self.options.get("archive_extract_dir"))
+            if not self.setCurrentTask(bag_tasks.BagExtractTask(), can_cancel=False):
+                return
+            self.currentTask.status_update_signal.connect(self.updateUI)
+            self.currentTask.extract(current_path, self.options.get("archive_extract_dir"))
             self.updateStatus("Extracting file: [%s] -- Please wait..." % current_path)
         elif is_bag:
             archive_format = self.options.get("archive_format", "zip")
-            self.bagTaskTriggered()
-            archiveTask = bag_tasks.BagArchiveTask()
-            archiveTask.status_update_signal.connect(self.updateUI)
-            archiveTask.archive(current_path, archive_format)
+            if not self.setCurrentTask(bag_tasks.BagArchiveTask()):
+                return
+            self.currentTask.status_update_signal.connect(self.updateUI)
+            self.currentTask.archive(current_path, archive_format)
             self.updateStatus("Archive (%s) initiated for bag: [%s] -- Please wait..." %
                               (archive_format.upper(), current_path))
 
@@ -271,21 +283,21 @@ class MainWindow(QMainWindow):
         current_path = self.getCurrentPath()
         if not current_path:
             return
-        self.bagTaskTriggered()
-        validateTask = bag_tasks.BagValidateTask()
-        validateTask.status_update_signal.connect(self.updateUI)
-        validateTask.validate(current_path, True, self.options.get("bag_config_file_path"))
+        if not self.setCurrentTask(bag_tasks.BagValidateTask()):
+            return
+        self.currentTask.status_update_signal.connect(self.updateUI)
+        self.currentTask.validate(current_path, True, self.options.get("bag_config_file_path"))
 
     @pyqtSlot(bool)
     def on_actionValidateFull_triggered(self):
         current_path = self.getCurrentPath()
         if not current_path:
             return
-        self.bagTaskTriggered()
-        validateTask = bag_tasks.BagValidateTask()
-        validateTask.status_update_signal.connect(self.updateUI)
-        validateTask.progress_update_signal.connect(self.updateProgress)
-        validateTask.validate(current_path, False, self.options.get("bag_config_file_path"))
+        if not self.setCurrentTask(bag_tasks.BagValidateTask()):
+            return
+        self.currentTask.status_update_signal.connect(self.updateUI)
+        self.currentTask.progress_update_signal.connect(self.updateProgress)
+        self.currentTask.validate(current_path, False, self.options.get("bag_config_file_path"))
         self.updateStatus("Full validation initiated for bag: [%s] -- Please wait..." % current_path)
 
     @pyqtSlot(bool)
@@ -293,14 +305,14 @@ class MainWindow(QMainWindow):
         current_path = self.getCurrentPath()
         if not current_path:
             return
-        self.bagTaskTriggered()
-        fetchTask = bag_tasks.BagFetchTask()
-        fetchTask.status_update_signal.connect(self.updateUI)
-        fetchTask.progress_update_signal.connect(self.updateProgress)
-        fetchTask.fetch(current_path,
-                        True,
-                        self.options.get("bag_keychain_file_path"),
-                        self.options.get("bag_config_file_path"))
+        if not self.setCurrentTask(bag_tasks.BagFetchTask()):
+            return
+        self.currentTask.status_update_signal.connect(self.updateUI)
+        self.currentTask.progress_update_signal.connect(self.updateProgress)
+        self.currentTask.fetch(current_path,
+                               True,
+                               self.options.get("bag_keychain_file_path"),
+                               self.options.get("bag_config_file_path"))
         self.updateStatus("Fetch all initiated for bag: [%s] -- Please wait..." % current_path)
 
     @pyqtSlot(bool)
@@ -308,14 +320,14 @@ class MainWindow(QMainWindow):
         current_path = self.getCurrentPath()
         if not current_path:
             return
-        self.bagTaskTriggered()
-        fetchTask = bag_tasks.BagFetchTask()
-        fetchTask.status_update_signal.connect(self.updateUI)
-        fetchTask.progress_update_signal.connect(self.updateProgress)
-        fetchTask.fetch(current_path,
-                        False,
-                        self.options.get("bag_keychain_file_path"),
-                        self.options.get("bag_config_file_path"))
+        if not self.setCurrentTask(bag_tasks.BagFetchTask()):
+            return
+        self.currentTask.status_update_signal.connect(self.updateUI)
+        self.currentTask.progress_update_signal.connect(self.updateProgress)
+        self.currentTask.fetch(current_path,
+                               False,
+                               self.options.get("bag_keychain_file_path"),
+                               self.options.get("bag_config_file_path"))
         self.updateStatus("Fetch missing initiated for bag: [%s] -- Please wait..." % current_path)
 
     @pyqtSlot(QModelIndex)
@@ -380,7 +392,7 @@ class MainWindowUI(object):
         self.verticalLayout.setSpacing(6)
         self.verticalLayout.setObjectName("verticalLayout")
 
-    # Actions
+        # Actions
 
         # Materialize
         self.actionMaterialize = QAction(MainWin)
@@ -471,7 +483,7 @@ class MainWindowUI(object):
         self.actionAbout.setToolTip(MainWin.tr("Show version information."))
         self.actionAbout.setShortcut(MainWin.tr("Ctrl+B"))
 
-    # Tree View
+        # Tree View
         self.treeView = QTreeView(self.centralWidget)
         self.treeView.setObjectName("treeView")
         self.treeView.setStyleSheet(
@@ -483,7 +495,7 @@ class MainWindowUI(object):
             """)
         self.verticalLayout.addWidget(self.treeView)
 
-    # Log Widget
+        # Log Widget
 
         self.logTextBrowser = log_widget.QPlainTextEditLogger(self.centralWidget)
         self.logTextBrowser.widget.setObjectName("logTextBrowser")
@@ -497,7 +509,7 @@ class MainWindowUI(object):
             """)
         self.verticalLayout.addWidget(self.logTextBrowser.widget)
 
-    # Menu Bar
+        # Menu Bar
 
         self.menuBar = QMenuBar(MainWin)
         self.menuBar.setObjectName("menuBar")
@@ -541,7 +553,7 @@ class MainWindowUI(object):
         self.menuHelp.addAction(self.actionAbout)
         self.menuBar.addAction(self.menuHelp.menuAction())
 
-    # Tool Bar
+        # Tool Bar
 
         self.mainToolBar = QToolBar(MainWin)
         self.mainToolBar.setObjectName("mainToolBar")
@@ -599,7 +611,7 @@ class MainWindowUI(object):
         self.actionOptions.setIcon(
             self.actionOptions.parentWidget().style().standardIcon(getattr(QStyle, "SP_FileDialogDetailedView")))
 
-    # Status Bar
+        # Status Bar
 
         self.statusBar = QStatusBar(MainWin)
         self.statusBar.setToolTip("")
@@ -607,7 +619,7 @@ class MainWindowUI(object):
         self.statusBar.setObjectName("statusBar")
         MainWin.setStatusBar(self.statusBar)
 
-    # Progress Bar
+        # Progress Bar
 
         self.progressBar = QProgressBar(self.centralWidget)
         self.progressBar.setValue(0)

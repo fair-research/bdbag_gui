@@ -1,86 +1,63 @@
 import sys
-from PyQt5 import QtCore
-from PyQt5.QtCore import Qt
+from PyQt5.QtCore import  QObject, QRunnable, QThreadPool, pyqtSignal
 
 
-def async_execute(method, args, uid, success_callback, error_callback=None):
-    request = Request(method, args, uid, success_callback, error_callback)
-    QtCore.QThreadPool.globalInstance().start(request)
-    return request
+def async_execute(task):
+    QThreadPool.globalInstance().start(task)
 
 
-class Request(QtCore.QRunnable):
+class TaskSignal(QObject):
+    callback = pyqtSignal(object, bool)
 
-    INSTANCES = []
-    FINISHED = []
+    def __init__(self, callback, parent=None):
+        super(TaskSignal, self).__init__(parent)
+        self.callback.connect(callback)
 
-    def __init__(self, method, args, uid, success_callback, error_callback=None):
-        super(Request, self).__init__()
-        self.setAutoDelete(True)
-        self.cancelled = False
+
+class Task(QRunnable):
+
+    def __init__(self, method, args, callback):
+        super(Task, self).__init__()
 
         self.method = method
         self.args = args
-        self.uid = uid
-        self.success = success_callback
-        self.error = error_callback
+        self.canceled = False
+        self.signal = None
+        self.callback = callback
+        self.setAutoDelete(True)
 
-        Request.INSTANCES.append(self)
+    def cancel(self):
+        self.canceled = True
 
-        # release all of the finished tasks
-        Request.FINISHED = []
+    def signal_success(self, result):
+        self.signal.callback.emit(result, True)
+
+    def signal_failure(self, result):
+        self.signal.callback.emit(result, False)
+
+    def signal_canceled(self):
+        self.signal.callback.emit("Task canceled.", False)
 
     def run(self):
-        # this allows us to "cancel" queued tasks if needed, should be done
-        # on shutdown to prevent the app from hanging
-        if self.cancelled:
-            self.cleanup()
+        self.signal = TaskSignal(self.callback)
+        if self.canceled:
+            self.signal_canceled()
             return
-
-        requester = Requester()
-        requester.Success.connect(self.success, Qt.QueuedConnection)
-        if self.error is not None:
-            requester.Error.connect(self.error, Qt.QueuedConnection)
-
         try:
             result = self.method(*self.args)
-            if self.cancelled:
+            if self.canceled:
+                self.signal_canceled()
                 return
-            requester.Success.emit(self.uid, result)
+            self.signal_success(result)
         except:
             (etype, value, traceback) = sys.exc_info()
-            if self.cancelled:
+            if self.canceled:
+                self.signal_canceled()
                 return
-            requester.Error.emit(self.uid, str(value))
+            self.signal_failure(str(value))
         finally:
-            self.cleanup(requester)
+            self.cleanup()
 
-    def cleanup(self, requester=None):
-        if requester is not None:
-            requester.deleteLater()
-
-        self.remove()
-
-    def remove(self):
-        try:
-            Request.INSTANCES.remove(self)
-            Request.FINISHED.append(self)
-        except ValueError:
-            return
-
-    @staticmethod
-    def shutdown():
-        for inst in Request.INSTANCES:
-            inst.cancelled = True
-        Request.INSTANCES = []
-        Request.FINISHED = []
-
-
-class Requester(QtCore.QObject):
-    
-    Error = QtCore.pyqtSignal(object, str)
-    Success = QtCore.pyqtSignal(object, object)
-    
-    def __init__(self, parent=None):
-        super(Requester, self).__init__(parent)
-
+    def cleanup(self):
+        if self.signal is not None:
+            self.signal.deleteLater()

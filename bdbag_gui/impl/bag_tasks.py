@@ -28,7 +28,7 @@ class BagCreateOrUpdateTask(BagTask):
     def success_callback(self, rid, result):
         if rid != self.rid:
             return
-        self.status_update_signal.emit("Bag %s completed successfully" % ("update" if self.update else "creation"),
+        self.status_update_signal.emit("Bag %s completed successfully." % ("update" if self.update else "creation"),
                                        True, self.update)
 
     def error_callback(self, rid, error):
@@ -56,12 +56,12 @@ class BagRevertTask(BagTask):
     def success_callback(self, rid, result):
         if rid != self.rid:
             return
-        self.status_update_signal.emit("Bag reverted successfully", True)
+        self.status_update_signal.emit("Bag reverted successfully.", True)
 
     def error_callback(self, rid, error):
         if rid != self.rid:
             return
-        self.status_update_signal.emit("Bag reversion failed", False)
+        self.status_update_signal.emit("Bag reversion failed: %s" % error, False)
 
     def revert(self, bagPath):
         self.init_request()
@@ -83,7 +83,7 @@ class BagValidateTask(BagTask):
     def success_callback(self, rid, result):
         if rid != self.rid:
             return
-        self.status_update_signal.emit("Bag validation complete", True)
+        self.status_update_signal.emit("Bag validation complete.", True)
 
     def error_callback(self, rid, error):
         if rid != self.rid:
@@ -117,8 +117,8 @@ class BagFetchTask(BagTask):
     def success_callback(self, rid, result):
         if rid != self.rid:
             return
-        self.status_update_signal.emit("Bag fetch complete: All file references resolved successfully" if result else
-                                       "Bag fetch incomplete: Some file references were not resolved", True)
+        self.status_update_signal.emit("Bag fetch complete: All file references resolved successfully." if result else
+                                       "Bag fetch incomplete: Some file references were not resolved.", True)
 
     def error_callback(self, rid, error):
         if rid != self.rid:
@@ -150,7 +150,7 @@ class BagArchiveTask(BagTask):
     def success_callback(self, rid, result):
         if rid != self.rid:
             return
-        self.status_update_signal.emit("Bag archive complete", True)
+        self.status_update_signal.emit("Bag archive complete.", True)
 
     def error_callback(self, rid, error):
         if rid != self.rid:
@@ -161,6 +161,64 @@ class BagArchiveTask(BagTask):
         self.init_request()
         self.request = async_execute(bdb.archive_bag,
                                      [bagPath, archiver],
+                                     self.rid,
+                                     self.success_callback,
+                                     self.error_callback)
+
+
+class BagExtractTask(BagTask):
+    status_update_signal = pyqtSignal(str, bool)
+
+    def __init__(self, parent=None):
+        super(BagExtractTask, self).__init__(parent)
+
+    def success_callback(self, rid, result):
+        if rid != self.rid:
+            return
+        self.status_update_signal.emit("File extraction complete.", True)
+
+    def error_callback(self, rid, error):
+        if rid != self.rid:
+            return
+        self.status_update_signal.emit("File extraction error: %s" % error, False)
+
+    def extract(self, bagPath, output_path=None):
+        self.init_request()
+        self.request = async_execute(bdb.extract_bag,
+                                     [bagPath, output_path],
+                                     self.rid,
+                                     self.success_callback,
+                                     self.error_callback)
+
+
+class BagMaterializeTask(BagTask):
+    status_update_signal = pyqtSignal(str, bool)
+    progress_update_signal = pyqtSignal(int, int)
+
+    def __init__(self, parent=None):
+        super(BagMaterializeTask, self).__init__(parent)
+
+    def success_callback(self, rid, result):
+        if rid != self.rid:
+            return
+        self.status_update_signal.emit("Bag materialization complete.", True)
+
+    def error_callback(self, rid, error):
+        if rid != self.rid:
+            return
+        self.status_update_signal.emit("Bag materialization error: %s" % error, False)
+
+    def progress_callback(self, current, maximum):
+        if self.request.cancelled:
+            return False
+
+        self.progress_update_signal.emit(current, maximum)
+        return True
+
+    def materialize(self, bagPath, output_path=None):
+        self.init_request()
+        self.request = async_execute(bdb.materialize,
+                                     [bagPath, output_path, self.progress_callback, self.progress_callback],
                                      self.rid,
                                      self.success_callback,
                                      self.error_callback)

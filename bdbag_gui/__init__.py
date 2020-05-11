@@ -2,12 +2,9 @@ import os
 import sys
 from pkg_resources import get_distribution, DistributionNotFound
 
+__version__ = "1.0.0b2"
+
 try:
     VERSION = get_distribution("bdbag_gui").version
 except DistributionNotFound:
-    VERSION = '0.0.dev0'
-
-if getattr(sys, 'frozen', False):
-        APP_DIR = getattr(sys, '_MEIPASS')
-else:
-        APP_DIR = os.path.dirname(__file__)
+    VERSION = __version__ + '-dev' if not getattr(sys, 'frozen', False) else __version__ + '-frozen'

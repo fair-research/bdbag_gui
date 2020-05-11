@@ -5,8 +5,14 @@
 
 """ Installation script for the bdbag_gui utility.
 """
-
+import io
+import re
 from setuptools import setup, find_packages
+
+__version__ = re.search(
+    r'__version__\s*=\s*[\'"]([^\'"]*)[\'"]',
+    io.open('bdbag_gui/__init__.py', encoding='utf_8_sig').read()
+    ).group(1)
 
 setup(
     name="bdbag_gui",
@@ -14,8 +20,9 @@ setup(
     url='https://github.com/fair-research/bdbag_gui/',
     maintainer='USC Information Sciences Institute, Informatics Systems Research Division',
     maintainer_email='isrd-support@isi.edu',
-    version="1.0.0-beta.1",
+    version=__version__,
     packages=find_packages(),
+    package_data={'bdbag_gui': ['images/bag.ico', 'images/bag.icns', 'images/bag.png']},
     entry_points={
         'gui_scripts': [
             'bdbag-gui = bdbag_gui.__main__:main',

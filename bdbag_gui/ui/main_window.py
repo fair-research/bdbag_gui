@@ -383,7 +383,7 @@ class MainWindowUI(object):
         # Main Window
         MainWin.setObjectName("MainWindow")
         MainWin.setWindowTitle(MainWin.tr("BDBag"))
-        MainWin.resize(680, 600)
+        MainWin.resize(700, 600)
         self.centralWidget = QWidget(MainWin)
         self.centralWidget.setObjectName("centralWidget")
         MainWin.setCentralWidget(self.centralWidget)

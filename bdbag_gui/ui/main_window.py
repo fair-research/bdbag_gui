@@ -1,6 +1,7 @@
 import os
 import json
 import logging
+import platform
 
 from PyQt5.QtCore import Qt, QMetaObject, QModelIndex, QThreadPool, QTimer, QMutex, pyqtSlot
 from PyQt5.QtWidgets import QApplication, QMainWindow, QWidget, QAction, QMenu, QMenuBar, QMessageBox, QStyle, \
@@ -370,7 +371,12 @@ class MainWindow(QMainWindow):
         msg.setIcon(QMessageBox.Information)
         msg.setWindowTitle("About BDBag GUI")
         msg.setText("Version Information")
-        msg.setInformativeText("BDBag GUI: %s\nBDBag: %s\nBagit: %s\n" % (VERSION, BDBAG_VERSION, BAGIT_VERSION))
+        msg.setInformativeText("BDBag GUI: %s\nBDBag: %s\nBagit: %s\n\nPython: %s\nPlatform: %s" %
+                               (VERSION,
+                                BDBAG_VERSION,
+                                BAGIT_VERSION,
+                                platform.python_version(),
+                                platform.platform(aliased=True)))
         msg.setStandardButtons(QMessageBox.Ok)
         ret = msg.exec_()
 

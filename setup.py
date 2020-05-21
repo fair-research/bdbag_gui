@@ -33,10 +33,9 @@ setup(
         'sys',
         'logging',
         'PyQt5'],
-    install_requires=['bdbag>=1.5.6'],
-    extras_require={
-        'PyQt5': ["PyQt5>=5.11.3"],
-    },
+    install_requires=[
+        'bdbag[boto,globus]>=1.5.6',
+        'PyQt5>=5.11.3'],
     license='GNU GPL 3.0',
     classifiers=[
         'Intended Audience :: Science/Research',

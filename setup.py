@@ -35,7 +35,7 @@ setup(
         'PyQt5'],
     install_requires=[
         'bdbag[boto,globus]>=1.5.6',
-        'PyQt5<=5.14'],
+        'PyQt5<5.15'],
     license='GNU GPL 3.0',
     classifiers=[
         'Intended Audience :: Science/Research',

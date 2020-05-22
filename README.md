@@ -4,7 +4,9 @@ Graphical User Interface for [bdbag](https://github.com/fair-research/bdbag) wri
 
 Pre-compiled bundles of the application for Windows and MacOSX can be found [here](https://github.com/ini-bdds/bdbag_gui/releases).
 
-WARNING: This is experimental software and should be considered BETA release quality. The code is stable, however, only basic functionality is currently supported.  
+*  MacOSX minimum supported version: 10.13.x (High Sierra)
+*  Windows minimum supported version: 10.x
+    *  `NOTE`: Fully patched versions of Windows 7 may also be compatible but are not officially supported.
 
 
 ![alt text](bdbag_gui/images/bdbag_gui.png)

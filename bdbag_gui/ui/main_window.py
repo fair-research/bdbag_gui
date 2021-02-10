@@ -8,7 +8,7 @@ from PyQt5.QtCore import Qt, QMetaObject, QModelIndex, QThreadPool, QTimer, QMut
 from PyQt5.QtWidgets import QApplication, QMainWindow, QWidget, QAction, QMenu, QMenuBar, QMessageBox, QStyle, \
     QProgressBar, QToolBar, QStatusBar, QVBoxLayout, QTreeView, QFileSystemModel, qApp
 from PyQt5.QtGui import QIcon
-from bdbag import VERSION as BDBAG_VERSION, BAGIT_VERSION, bdbag_api as bdb
+from bdbag import VERSION as BDBAG_VERSION, BAGIT_VERSION, BAGIT_PROFILE_VERSION, bdbag_api as bdb
 from bdbag_gui import resources, VERSION
 from bdbag_gui.ui import log_widget, options_window
 from bdbag_gui.ui.options_window import DEFAULT_OPTIONS, DEFAULT_OPTIONS_FILE
@@ -216,6 +216,17 @@ class MainWindow(QMainWindow):
         current_path = self.getCurrentPath()
         if not current_path:
             return
+
+        if os.path.dirname(current_path) == current_path:
+            msg = QMessageBox()
+            msg.setIcon(QMessageBox.Critical)
+            msg.setWindowTitle("Operation not allowed")
+            msg.setText("Bagging of root filesystems prohibited.")
+            msg.setInformativeText(
+                "The current selection is a filesystem root. It is not possible to create a bag of a filesystem root.")
+            msg.exec_()
+            return
+
         if not self.setCurrentTask(bag_tasks.BagCreateOrUpdateTask()):
             return
         self.currentTask.status_update_signal.connect(self.updateUI)
@@ -372,10 +383,12 @@ class MainWindow(QMainWindow):
         msg.setIcon(QMessageBox.Information)
         msg.setWindowTitle("About BDBag GUI")
         msg.setText("Version Information")
-        msg.setInformativeText("BDBag GUI: %s\nBDBag: %s\nBagit: %s\n\nPython: %s\nPyQt: %s\nPlatform: %s" %
+        msg.setInformativeText("BDBag GUI: %s\nBDBag: %s\nBagit: %s\nBagitProfile: %s\n\n"
+                               "Python: %s\nPyQt: %s\nPlatform: %s" %
                                (VERSION,
                                 BDBAG_VERSION,
                                 BAGIT_VERSION,
+                                BAGIT_PROFILE_VERSION,
                                 platform.python_version(),
                                 PYQT_VERSION_STR,
                                 platform.platform(aliased=True)))
@@ -566,6 +579,7 @@ class MainWindowUI(object):
         self.mainToolBar = QToolBar(MainWin)
         self.mainToolBar.setObjectName("mainToolBar")
         self.mainToolBar.setToolButtonStyle(Qt.ToolButtonTextUnderIcon)
+        self.mainToolBar.setContextMenuPolicy(Qt.PreventContextMenu)
         MainWin.addToolBar(Qt.TopToolBarArea, self.mainToolBar)
 
         # Materialize

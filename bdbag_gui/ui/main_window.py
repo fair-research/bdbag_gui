@@ -42,6 +42,7 @@ class MainWindow(QMainWindow):
 
         self.loadOptions()
         self.enableControls(True)
+        self.ui.actionCreateOrUpdate.setEnabled(False)
 
     def loadOptions(self, options_file=DEFAULT_OPTIONS_FILE):
         if not os.path.isfile(options_file):
@@ -146,7 +147,8 @@ class MainWindow(QMainWindow):
         self.ui.actionCancel.setEnabled(False)
         self.ui.actionDelete.setEnabled(False if (not current_type or "Drive" == current_type) else True)
         self.ui.toggleCreateOrUpdate(self, is_bag)
-        self.ui.actionCreateOrUpdate.setEnabled(os.path.isdir(current_path) if current_path else False)
+        self.ui.actionCreateOrUpdate.setEnabled(
+            (os.path.isdir(current_path) and "Drive" != current_type) if current_path else False)
         self.ui.actionRevert.setEnabled(is_bag)
         self.ui.actionMaterialize.setEnabled(is_bag or is_file_archive)
         self.ui.actionFetchMissing.setEnabled(is_bag)
@@ -383,7 +385,7 @@ class MainWindow(QMainWindow):
         msg.setIcon(QMessageBox.Information)
         msg.setWindowTitle("About BDBag GUI")
         msg.setText("Version Information")
-        msg.setInformativeText("BDBag GUI: %s\nBDBag: %s\nBagit: %s\nBagitProfile: %s\n\n"
+        msg.setInformativeText("BDBag GUI: %s\nBDBag: %s\nBagit: %s\nBagit-Profile: %s\n\n"
                                "Python: %s\nPyQt: %s\nPlatform: %s" %
                                (VERSION,
                                 BDBAG_VERSION,

@@ -6,6 +6,7 @@ from PyInstaller.utils.hooks import copy_metadata
 
 metadata = []
 metadata.append(copy_metadata('bagit')[0])
+metadata.append(copy_metadata('bagit_profile')[0])
 metadata.append(copy_metadata('bdbag')[0])
 metadata.append(copy_metadata('bdbag_gui')[0])
 

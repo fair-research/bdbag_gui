@@ -4,9 +4,9 @@ import logging
 import platform
 
 from PyQt5.Qt import PYQT_VERSION_STR
-from PyQt5.QtCore import Qt, QMetaObject, QModelIndex, QThreadPool, QTimer, QMutex, pyqtSlot
+from PyQt5.QtCore import Qt, QDir, QMetaObject, QModelIndex, QThreadPool, QTimer, QMutex, pyqtSlot
 from PyQt5.QtWidgets import QApplication, QMainWindow, QWidget, QAction, QMenu, QMenuBar, QMessageBox, QStyle, \
-    QProgressBar, QToolBar, QStatusBar, QVBoxLayout, QTreeView, QFileSystemModel, qApp
+    QProgressBar, QToolBar, QStatusBar, QVBoxLayout, QTreeView, QFileSystemModel, QAbstractItemView, qApp
 from PyQt5.QtGui import QIcon
 from bdbag import VERSION as BDBAG_VERSION, BAGIT_VERSION, BAGIT_PROFILE_VERSION, bdbag_api as bdb
 from bdbag_gui import resources, VERSION
@@ -33,16 +33,22 @@ class MainWindow(QMainWindow):
         self.fileSystemModel = QFileSystemModel()
         self.fileSystemModel.setReadOnly(False)
         self.ui.treeView.setModel(self.fileSystemModel)
+        self.fileSystemModel.setRootPath(self.fileSystemModel.myComputer())
         self.ui.treeView.setAnimated(True)
         self.ui.treeView.setAcceptDrops(True)
+        self.ui.treeView.setAutoScroll(True)
+        self.ui.treeView.setAutoExpandDelay(0)
         self.ui.treeView.setSortingEnabled(True)
         self.ui.treeView.sortByColumn(0, Qt.AscendingOrder)
         self.ui.treeView.setColumnWidth(0, 300)
-        self.ui.treeView.setRootIndex(self.fileSystemModel.setRootPath(self.fileSystemModel.myComputer()))
 
         self.loadOptions()
+        homedir_index = self.fileSystemModel.index(self.options.get("current_dir", QDir.home().path()))
+        self.ui.treeView.setCurrentIndex(homedir_index)
+        self.ui.treeView.setExpanded(homedir_index, True)
+        QTimer.singleShot(1300, self.selectionChanged)
+
         self.enableControls(True)
-        self.ui.actionCreateOrUpdate.setEnabled(False)
 
     def loadOptions(self, options_file=DEFAULT_OPTIONS_FILE):
         if not os.path.isfile(options_file):
@@ -162,9 +168,12 @@ class MainWindow(QMainWindow):
         self.ui.progressBar.reset()
         self.ui.logTextBrowser.widget.clear()
         self.enableControls()
+        self.ui.treeView.scrollTo(self.ui.treeView.currentIndex(), QAbstractItemView.PositionAtCenter)
+        self.options["current_dir"] = self.getCurrentPath()
 
     def closeEvent(self, event):
         self.cancelTasks()
+        self.saveOptions()
         event.accept()
 
     def cancelTasks(self):

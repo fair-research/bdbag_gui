@@ -2,7 +2,7 @@ import os
 import sys
 from pkg_resources import get_distribution, DistributionNotFound
 
-__version__ = "1.2.0"
+__version__ = "1.2.1"
 
 try:
     version = get_distribution("bdbag_gui").version

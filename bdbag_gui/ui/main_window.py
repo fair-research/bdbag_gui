@@ -105,7 +105,7 @@ class MainWindow(QMainWindow):
         if current_path and os.path.isfile(current_path):
             # simple test based on extension only
             ext = os.path.splitext(current_path)[1]
-            if ext in (".zip", ".tar", ".tgz", ".gz", ".bz2"):
+            if ext in (".zip", ".tar", ".tgz", ".gz", ".bz2", ".xz"):
                 is_file_archive = True
 
         if is_file_archive and not silent:

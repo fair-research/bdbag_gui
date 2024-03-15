@@ -111,6 +111,10 @@ class OptionsDialog(QDialog):
         self.archiveFormatBZ2Button.setChecked(self.archive_format.lower() == "bz2")
         self.archiveFormatBZ2Button.toggled.connect(self.onArchiveFormatChanged)
         self.archiveFormatLayout.addWidget(self.archiveFormatBZ2Button)
+        self.archiveFormatXZButton = QRadioButton("&XZ")
+        self.archiveFormatXZButton.setChecked(self.archive_format.lower() == "xz")
+        self.archiveFormatXZButton.toggled.connect(self.onArchiveFormatChanged)
+        self.archiveFormatLayout.addWidget(self.archiveFormatXZButton)
         self.archiveFormatTARButton = QRadioButton("&TAR")
         self.archiveFormatTARButton.setChecked(self.archive_format.lower() == "tar")
         self.archiveFormatTARButton.toggled.connect(self.onArchiveFormatChanged)
@@ -197,6 +201,8 @@ class OptionsDialog(QDialog):
                 self.archive_format = "tgz"
             elif self.archiveFormatBZ2Button.isChecked():
                 self.archive_format = "bz2"
+            elif self.archiveFormatXZButton.isChecked():
+                self.archive_format = "xz"
             elif self.archiveFormatTARButton.isChecked():
                 self.archive_format = "tar"
 

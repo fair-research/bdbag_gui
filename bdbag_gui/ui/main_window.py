@@ -1,5 +1,6 @@
 import os
 import json
+import errno
 import logging
 import platform
 
@@ -61,7 +62,7 @@ class MainWindow(QMainWindow):
                 options = of.read()
         else:
             options = json.dumps(DEFAULT_OPTIONS)
-            logger.warning("Unable to read options file: [%s]. Using internal defaults." % config_file)
+            logging.warning("Unable to read options file: [%s]. Using internal defaults." % options_file)
 
         self.options = json.loads(options)
 
@@ -78,7 +79,7 @@ class MainWindow(QMainWindow):
             with open(options_file, 'w') as of:
                 of.write(json.dumps(self.options, indent=4, sort_keys=True))
         except Exception as e:
-            logger.warning("Unable to write options file: [%s]. Error: %s" % (options_file, e))
+            logging.warning("Unable to write options file: [%s]. Error: %s" % (options_file, e))
 
     def checkIfBag(self, silent=False):
         current_path = self.getCurrentPath()
@@ -666,9 +667,9 @@ class MainWindowUI(object):
                     text-align: center;
             }
             QProgressBar::chunk {
-                    background-color: cornflowerblue;
-                    width: 15px;
-                    margin: 0.5px;
+                    background: QLinearGradient( x1: 0, y1: 0, x2: 1, y2: 0,
+                                                stop: 0 #bbe0fa,
+                                                stop: 1 #3088c8 );
             }
             """)
         self.verticalLayout.addWidget(self.progressBar)
